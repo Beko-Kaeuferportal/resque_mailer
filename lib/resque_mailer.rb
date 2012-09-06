@@ -33,7 +33,15 @@ module Resque
       end
 
       def perform(action, *args)
-        self.send(:new, action, *args).message.deliver
+        retries = 0
+        begin
+          self.send(:new, action, *args).message.deliver
+        rescue Errno::ETIMEDOUT => ex
+          retries += 1
+          raise ex if retries > 3
+          Kernel.sleep(1)
+          retry
+        end
       end
 
       def environment_excluded?
